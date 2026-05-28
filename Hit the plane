@@ -101,18 +101,73 @@ printf("Ж");
 // 计分/更新敌机
 void jifan()
 {
-if(x==d&&y==r)
-{ gotoxy(d,r); printf("3");
-Sleep(200);
-gotoxy(d,r); printf(" "); f+=2; r=0; j++;}
-if(x==d1&&y==r1)
-{ gotoxy(d1,r1); printf("1");
-Sleep(200);
-gotoxy(d1,r1); printf(" "); f+=3; r1=0; j++;}
-if(x==d2&&y==r2)
-{ gotoxy(d2,r2); printf("0");
-Sleep(200);
-gotoxy(d2,r2); printf(" "); f+=1; r2=0; j++;}
+int enemyx[3]={d,d1,d2};
+int enemyy[3]={r,r1,r2};
+int enemyfenshu[3]={2,3,1};
+int *enemystate[3]={&r,&r1,&r2};
+char enemyicon[3]={'3','1','0'};
+int particle[8][2]={{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+int i,k;
+int bulletx=x*10+5;
+int bullety=y*10+5;
+
+for(i=0;i<3;i++)
+{
+int left=enemyx[i]*10;
+int top=enemyy[i]*10;
+int right=left+10;
+int bottom=top+10;
+int shrinkx=(right-left)*15/100;
+int shrinky=(bottom-top)*15/100;
+int hitleft=left+shrinkx;
+int hitright=right-shrinkx;
+int hittop=top+shrinky;
+int hitbottom=bottom-shrinky;
+
+if(bulletx>=hitleft&&bulletx<=hitright&&bullety>=hittop&&bullety<=hitbottom)
+{
+gotoxy(enemyx[i],enemyy[i]); printf("%c",enemyicon[i]);
+Sleep(40);
+for(k=0;k<8;k++)
+{
+int px=enemyx[i]+particle[k][0];
+int py=enemyy[i]+particle[k][1];
+if(px>0&&px<20&&py>0&&py<20)
+{
+gotoxy(px,py);
+printf("*");
+}
+}
+gotoxy(enemyx[i],enemyy[i]); printf("@");
+Sleep(60);
+for(k=0;k<8;k++)
+{
+int px=enemyx[i]+particle[k][0];
+int py=enemyy[i]+particle[k][1];
+if(px>0&&px<20&&py>0&&py<20)
+{
+gotoxy(px,py);
+printf(".");
+}
+}
+gotoxy(enemyx[i],enemyy[i]); printf(" ");
+Sleep(40);
+for(k=0;k<8;k++)
+{
+int px=enemyx[i]+particle[k][0];
+int py=enemyy[i]+particle[k][1];
+if(px>0&&px<20&&py>0&&py<20)
+{
+gotoxy(px,py);
+printf(" ");
+}
+}
+f+=enemyfenshu[i];
+*enemystate[i]=0;
+j++;
+break;
+}
+}
 
 gotoxy(26,2);
 printf(" %d \n",f);
