@@ -1,3 +1,33 @@
+diff --git a/1.patch b/1.patch
+new file mode 100644
+index 0000000..6c3ed25
+--- /dev/null
++++ b/1.patch
+@@ -0,0 +1,24 @@
++diff --git a/1.1.1.patch b/1.1.1.patch
++deleted file mode 100644
++index 136d063..0000000
++--- a/1.1.1.patch
+++++ /dev/null
++@@ -1 +0,0 @@
++-  
++\ No newline at end of file
++diff --git a/1.1.2.patch b/1.1.2.patch
++deleted file mode 100644
++index 4deb4dd..0000000
++--- a/1.1.2.patch
+++++ /dev/null
++@@ -1,7 +0,0 @@
++-diff --git a/1.1.1.patch b/1.1.1.patch
++-index e69de29..136d063 100644
++---- a/1.1.1.patch
++-+++ b/1.1.1.patch
++-@@ -0,0 +1 @@
++-+  
++-\ No newline at end of file
++diff --git a/1.1.3..patch b/1.1.3..patch
++deleted file mode 100644
++index e69de29..0000000
 diff --git a/2.1.1.patch b/2.1.1.patch
 index 6c3ed25..79f7f40 100644
 --- a/2.1.1.patch
@@ -137,6 +167,184 @@ index 6c3ed25..79f7f40 100644
 ++diff --git a/1.1.3..patch b/1.1.3..patch
 ++new file mode 100644
 ++index 0000000..e69de29
+diff --git a/2.1.2.patch b/2.1.2.patch
+new file mode 100644
+index 0000000..954a72a
+--- /dev/null
++++ b/2.1.2.patch
+@@ -0,0 +1,148 @@
++diff --git a/2.1.1.patch b/2.1.1.patch
++index 6c3ed25..79f7f40 100644
++--- a/2.1.1.patch
+++++ b/2.1.1.patch
++@@ -19,6 +19,131 @@ index 4deb4dd..0000000
++ -@@ -0,0 +1 @@
++ -+  
++ -\ No newline at end of file
++-diff --git a/1.1.3..patch b/1.1.3..patch
++-deleted file mode 100644
++-index e69de29..0000000
+++diff --git a/2.1.1.patch b/2.1.1.patch
+++new file mode 100644
+++index 0000000..6c3ed25
+++--- /dev/null
++++++ b/2.1.1.patch
+++@@ -0,0 +1,24 @@
++++diff --git a/1.1.1.patch b/1.1.1.patch
++++deleted file mode 100644
++++index 136d063..0000000
++++--- a/1.1.1.patch
+++++++ /dev/null
++++@@ -1 +0,0 @@
++++-  
++++\ No newline at end of file
++++diff --git a/1.1.2.patch b/1.1.2.patch
++++deleted file mode 100644
++++index 4deb4dd..0000000
++++--- a/1.1.2.patch
+++++++ /dev/null
++++@@ -1,7 +0,0 @@
++++-diff --git a/1.1.1.patch b/1.1.1.patch
++++-index e69de29..136d063 100644
++++---- a/1.1.1.patch
++++-+++ b/1.1.1.patch
++++-@@ -0,0 +1 @@
++++-+  
++++-\ No newline at end of file
++++diff --git a/1.1.3..patch b/1.1.3..patch
++++deleted file mode 100644
++++index e69de29..0000000
+++diff --git a/Hit the plane b/Hit the plane
+++index 80000ce..ecfb085 100644
+++--- a/Hit the plane	
++++++ b/Hit the plane	
+++@@ -106,7 +106,8 @@ int enemyy[3]={r,r1,r2};
+++ int enemyfenshu[3]={2,3,1};
+++ int *enemystate[3]={&r,&r1,&r2};
+++ char enemyicon[3]={'3','1','0'};
+++-int particle[8][2]={{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
++++int particle1[8][2]={{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
++++int particle2[12][2]={{-2,0},{2,0},{0,-2},{0,2},{-2,-1},{2,-1},{-2,1},{2,1},{-1,-2},{1,-2},{-1,2},{1,2}};
+++ int i,k;
+++ int bulletx=x*10+5;
+++ int bullety=y*10+5;
+++@@ -115,24 +116,21 @@ for(i=0;i<3;i++)
+++ {
+++ int left=enemyx[i]*10;
+++ int top=enemyy[i]*10;
+++-int right=left+10;
+++-int bottom=top+10;
+++-int shrinkx=(right-left)*15/100; // 缩小宽度 30% (左右各15%)
+++-int shrinky=(bottom-top)*15/100;   // 缩小高度 30% (上下各15%)
+++-int hitleft=left+shrinkx;
+++-int hitright=right-shrinkx;
+++-int hittop=top+shrinky;
+++-int hitbottom=bottom-shrinky;
++++int hitwidth=10-10*3/10;
++++int hitheight=10-10*3/10;
++++int hitleft=left+(10-hitwidth)/2;
++++int hittop=top+(10-hitheight)/2;
++++int hitright=hitleft+hitwidth;
++++int hitbottom=hittop+hitheight;
+++ 
+++ if(bulletx>=hitleft&&bulletx<=hitright&&bullety>=hittop&&bullety<=hitbottom)
+++ {
+++ gotoxy(enemyx[i],enemyy[i]); printf("%c",enemyicon[i]);
+++-Sleep(40);
+++-// 增加击中后的爆炸粒子效果
++++Sleep(20);
+++ for(k=0;k<8;k++)
+++ {
+++-int px=enemyx[i]+particle[k][0];
+++-int py=enemyy[i]+particle[k][1];
++++int px=enemyx[i]+particle1[k][0];
++++int py=enemyy[i]+particle1[k][1];
+++ if(px>0&&px<20&&py>0&&py<20)
+++ {
+++ gotoxy(px,py);
+++@@ -140,23 +138,34 @@ printf("*");
+++ }
+++ }
+++ gotoxy(enemyx[i],enemyy[i]); printf("@");
+++-Sleep(60);
++++Sleep(40);
+++ for(k=0;k<8;k++)
+++ {
+++-int px=enemyx[i]+particle[k][0];
+++-int py=enemyy[i]+particle[k][1];
++++int px=enemyx[i]+particle1[k][0];
++++int py=enemyy[i]+particle1[k][1];
++++if(px>0&&px<20&&py>0&&py<20)
++++{
++++gotoxy(px,py);
++++printf(" ");
++++}
++++}
++++for(k=0;k<12;k++)
++++{
++++int px=enemyx[i]+particle2[k][0];
++++int py=enemyy[i]+particle2[k][1];
+++ if(px>0&&px<20&&py>0&&py<20)
+++ {
+++ gotoxy(px,py);
+++ printf(".");
+++ }
+++ }
++++gotoxy(enemyx[i],enemyy[i]); printf("*");
++++Sleep(50);
+++ gotoxy(enemyx[i],enemyy[i]); printf(" ");
+++-Sleep(40);
+++-for(k=0;k<8;k++)
++++for(k=0;k<12;k++)
+++ {
+++-int px=enemyx[i]+particle[k][0];
+++-int py=enemyy[i]+particle[k][1];
++++int px=enemyx[i]+particle2[k][0];
++++int py=enemyy[i]+particle2[k][1];
+++ if(px>0&&px<20&&py>0&&py<20)
+++ {
+++ gotoxy(px,py);
+++diff --git a/filename.patch b/filename.patch
+++index e69de29..3da5d33 100644
+++--- a/filename.patch
++++++ b/filename.patch
+++@@ -0,0 +1,3 @@
++++diff --git a/1.1.3..patch b/1.1.3..patch
++++new file mode 100644
++++index 0000000..e69de29
++diff --git a/filename.patch b/filename.patch
++deleted file mode 100644
++index 3da5d33..0000000
++--- a/filename.patch
+++++ /dev/null
++@@ -1,3 +0,0 @@
++-diff --git a/1.1.3..patch b/1.1.3..patch
++-new file mode 100644
++-index 0000000..e69de29
+diff --git a/Hit the plane b/Hit the plane
+index ecfb085..c650d8d 100644
+--- a/Hit the plane	
++++ b/Hit the plane	
+@@ -116,8 +116,9 @@ for(i=0;i<3;i++)
+ {
+ int left=enemyx[i]*10;
+ int top=enemyy[i]*10;
+-int hitwidth=10-10*3/10;
+-int hitheight=10-10*3/10;
++// 将碰撞矩形缩小 30%
++int hitwidth=10 * 0.7;
++int hitheight=10 * 0.7;
+ int hitleft=left+(10-hitwidth)/2;
+ int hittop=top+(10-hitheight)/2;
+ int hitright=hitleft+hitwidth;
+@@ -127,6 +128,7 @@ if(bulletx>=hitleft&&bulletx<=hitright&&bullety>=hittop&&bullety<=hitbottom)
+ {
+ gotoxy(enemyx[i],enemyy[i]); printf("%c",enemyicon[i]);
+ Sleep(20);
++// 增加击中后的爆炸粒子效果
+ for(k=0;k<8;k++)
+ {
+ int px=enemyx[i]+particle1[k][0];
 diff --git a/filename.patch b/filename.patch
 deleted file mode 100644
 index 3da5d33..0000000
@@ -146,3 +354,25 @@ index 3da5d33..0000000
 -diff --git a/1.1.3..patch b/1.1.3..patch
 -new file mode 100644
 -index 0000000..e69de29
+diff --git a/find_main.py b/find_main.py
+new file mode 100644
+index 0000000..80d7da4
+--- /dev/null
++++ b/find_main.py
+@@ -0,0 +1,5 @@
++import os
++for root, dirs, files in os.walk('/app/C-Language-Games'):
++    for f in files:
++        if 'main.c' in f or 'Hit' in f or 'hit' in f.lower():
++            print(os.path.join(root, f))
+diff --git a/list_all.py b/list_all.py
+new file mode 100644
+index 0000000..f6f2e43
+--- /dev/null
++++ b/list_all.py
+@@ -0,0 +1,5 @@
++import os
++with open('/app/C-Language-Games/all_files.txt', 'w') as f:
++    for root, dirs, files in os.walk('/app/C-Language-Games'):
++        for file in files:
++            f.write(os.path.join(root, file) + '\n')
