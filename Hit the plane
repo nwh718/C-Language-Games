@@ -106,7 +106,8 @@ int enemyy[3]={r,r1,r2};
 int enemyfenshu[3]={2,3,1};
 int *enemystate[3]={&r,&r1,&r2};
 char enemyicon[3]={'3','1','0'};
-int particle[8][2]={{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+int particle1[8][2]={{-1,0},{1,0},{0,-1},{0,1},{-1,-1},{1,-1},{-1,1},{1,1}};
+int particle2[12][2]={{-2,0},{2,0},{0,-2},{0,2},{-2,-1},{2,-1},{-2,1},{2,1},{-1,-2},{1,-2},{-1,2},{1,2}};
 int i,k;
 int bulletx=x*10+5;
 int bullety=y*10+5;
@@ -115,24 +116,21 @@ for(i=0;i<3;i++)
 {
 int left=enemyx[i]*10;
 int top=enemyy[i]*10;
-int right=left+10;
-int bottom=top+10;
-int shrinkx=(right-left)*15/100; // 缩小宽度 30% (左右各15%)
-int shrinky=(bottom-top)*15/100;   // 缩小高度 30% (上下各15%)
-int hitleft=left+shrinkx;
-int hitright=right-shrinkx;
-int hittop=top+shrinky;
-int hitbottom=bottom-shrinky;
+int hitwidth=10-10*3/10;
+int hitheight=10-10*3/10;
+int hitleft=left+(10-hitwidth)/2;
+int hittop=top+(10-hitheight)/2;
+int hitright=hitleft+hitwidth;
+int hitbottom=hittop+hitheight;
 
 if(bulletx>=hitleft&&bulletx<=hitright&&bullety>=hittop&&bullety<=hitbottom)
 {
 gotoxy(enemyx[i],enemyy[i]); printf("%c",enemyicon[i]);
-Sleep(40);
-// 增加击中后的爆炸粒子效果
+Sleep(20);
 for(k=0;k<8;k++)
 {
-int px=enemyx[i]+particle[k][0];
-int py=enemyy[i]+particle[k][1];
+int px=enemyx[i]+particle1[k][0];
+int py=enemyy[i]+particle1[k][1];
 if(px>0&&px<20&&py>0&&py<20)
 {
 gotoxy(px,py);
@@ -140,23 +138,34 @@ printf("*");
 }
 }
 gotoxy(enemyx[i],enemyy[i]); printf("@");
-Sleep(60);
+Sleep(40);
 for(k=0;k<8;k++)
 {
-int px=enemyx[i]+particle[k][0];
-int py=enemyy[i]+particle[k][1];
+int px=enemyx[i]+particle1[k][0];
+int py=enemyy[i]+particle1[k][1];
+if(px>0&&px<20&&py>0&&py<20)
+{
+gotoxy(px,py);
+printf(" ");
+}
+}
+for(k=0;k<12;k++)
+{
+int px=enemyx[i]+particle2[k][0];
+int py=enemyy[i]+particle2[k][1];
 if(px>0&&px<20&&py>0&&py<20)
 {
 gotoxy(px,py);
 printf(".");
 }
 }
+gotoxy(enemyx[i],enemyy[i]); printf("*");
+Sleep(50);
 gotoxy(enemyx[i],enemyy[i]); printf(" ");
-Sleep(40);
-for(k=0;k<8;k++)
+for(k=0;k<12;k++)
 {
-int px=enemyx[i]+particle[k][0];
-int py=enemyy[i]+particle[k][1];
+int px=enemyx[i]+particle2[k][0];
+int py=enemyy[i]+particle2[k][1];
 if(px>0&&px<20&&py>0&&py<20)
 {
 gotoxy(px,py);
