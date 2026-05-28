@@ -116,8 +116,9 @@ for(i=0;i<3;i++)
 {
 int left=enemyx[i]*10;
 int top=enemyy[i]*10;
-int hitwidth=10-10*3/10;
-int hitheight=10-10*3/10;
+// 将碰撞矩形缩小 30%
+int hitwidth=10 * 0.7;
+int hitheight=10 * 0.7;
 int hitleft=left+(10-hitwidth)/2;
 int hittop=top+(10-hitheight)/2;
 int hitright=hitleft+hitwidth;
@@ -127,6 +128,7 @@ if(bulletx>=hitleft&&bulletx<=hitright&&bullety>=hittop&&bullety<=hitbottom)
 {
 gotoxy(enemyx[i],enemyy[i]); printf("%c",enemyicon[i]);
 Sleep(20);
+// 增加击中后的爆炸粒子效果
 for(k=0;k<8;k++)
 {
 int px=enemyx[i]+particle1[k][0];
