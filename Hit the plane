@@ -117,8 +117,8 @@ int left=enemyx[i]*10;
 int top=enemyy[i]*10;
 int right=left+10;
 int bottom=top+10;
-int shrinkx=(right-left)*15/100;
-int shrinky=(bottom-top)*15/100;
+int shrinkx=(right-left)*15/100; // 缩小宽度 30% (左右各15%)
+int shrinky=(bottom-top)*15/100;   // 缩小高度 30% (上下各15%)
 int hitleft=left+shrinkx;
 int hitright=right-shrinkx;
 int hittop=top+shrinky;
@@ -128,6 +128,7 @@ if(bulletx>=hitleft&&bulletx<=hitright&&bullety>=hittop&&bullety<=hitbottom)
 {
 gotoxy(enemyx[i],enemyy[i]); printf("%c",enemyicon[i]);
 Sleep(40);
+// 增加击中后的爆炸粒子效果
 for(k=0;k<8;k++)
 {
 int px=enemyx[i]+particle[k][0];
