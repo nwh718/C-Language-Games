@@ -1,0 +1,176 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <windows.h>
+#include <conio.h>
+
+typedef struct {
+    int x;
+    int y;
+} Player;
+
+typedef struct {
+    int x;
+    int y;
+    int alive;
+} Target;
+
+typedef struct {
+    int x;
+    int y;
+    int active;
+} Bullet;
+
+typedef struct {
+    Player player;
+    Target target;
+    Bullet bullet;
+} GameState;
+
+void game_init(GameState *game)
+{
+    game->player.x = 5;
+    game->player.y = 10;
+
+    game->target.x = 5;
+    game->target.y = 5;
+    game->target.alive = 1;
+
+    game->bullet.x = 0;
+    game->bullet.y = 0;
+    game->bullet.active = 0;
+}
+
+void render_target(const Target *target)
+{
+    int i;
+
+    if (!target->alive) {
+        return;
+    }
+
+    for (i = 0; i < target->y; ++i) {
+        printf("\n");
+    }
+    for (i = 0; i < target->x; ++i) {
+        printf(" ");
+    }
+    printf("+\n");
+}
+
+void render_bullet(const Bullet *bullet, int player_x)
+{
+    int i, j;
+
+    if (!bullet->active) {
+        return;
+    }
+
+    for (i = 0; i < bullet->y; ++i) {
+        for (j = 0; j < player_x; ++j) {
+            printf(" ");
+        }
+        printf("  |\n");
+    }
+}
+
+void render_player(const Player *player)
+{
+    int i;
+
+    for (i = 0; i < player->x; ++i) {
+        printf(" ");
+    }
+    printf("  *\n");
+
+    for (i = 0; i < player->x; ++i) {
+        printf(" ");
+    }
+    printf("*****\n");
+
+    for (i = 0; i < player->x; ++i) {
+        printf(" ");
+    }
+    printf(" * *\n");
+}
+
+void render_game(const GameState *game)
+{
+    system("cls");
+    render_target(&game->target);
+
+    if (game->bullet.active) {
+        render_bullet(&game->bullet, game->player.x);
+    } else {
+        int i;
+        for (i = 0; i < game->player.y; ++i) {
+            printf("\n");
+        }
+    }
+
+    render_player(&game->player);
+}
+
+int check_collision(const Player *player, const Target *target)
+{
+    return (player->x + 2 == target->x);
+}
+
+void fire_bullet(Bullet *bullet, const Player *player)
+{
+    bullet->x = player->x;
+    bullet->y = player->y;
+    bullet->active = 1;
+}
+
+void handle_input(GameState *game, char input)
+{
+    switch (input) {
+    case 's':
+        game->player.y++;
+        break;
+    case 'w':
+        game->player.y--;
+        break;
+    case 'a':
+        game->player.x--;
+        break;
+    case 'd':
+        game->player.x++;
+        break;
+    case ' ':
+        fire_bullet(&game->bullet, &game->player);
+        break;
+    default:
+        break;
+    }
+}
+
+void update_game(GameState *game)
+{
+    if (game->bullet.active) {
+        if (check_collision(&game->player, &game->target)) {
+            game->target.alive = 0;
+        }
+        game->bullet.active = 0;
+    }
+}
+
+int main(void)
+{
+    GameState game;
+    char input;
+
+    game_init(&game);
+
+    while (1) {
+        render_game(&game);
+
+        input = getch();
+
+        handle_input(&game, input);
+
+        update_game(&game);
+    }
+
+    return 0;
+}
