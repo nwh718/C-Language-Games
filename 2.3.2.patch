@@ -1,0 +1,621 @@
+diff --git a/2.3.1.patch b/2.3.1.patch
+index e69de29..e2a1716 100644
+--- a/2.3.1.patch
++++ b/2.3.1.patch
+@@ -0,0 +1,616 @@
++diff --git a/2.3.1.patch b/2.3.1.patch
++new file mode 100644
++index 0000000..e69de29
++diff --git a/Hit the plane b/Hit the plane
++index 9f3325c..e85c278 100644
++--- a/Hit the plane	
+++++ b/Hit the plane	
++@@ -1,244 +1,414 @@
++-#include "stdio.h"
+++#include <stdio.h>
+++#include <stdlib.h>
++ #include <windows.h>
++ #include <conio.h>
++ #include <time.h>
++-#define Esc 27 //退出
++-#define Up 72 //上，下，左，右
+++
+++#define Esc 27
+++#define Up 72
++ #define Down 80
++ #define Left 75
++ #define Right 77
++-#define Kong 32 //发射子弹
++-
++-
++-int x=10; //飞机坐标
++-int y=18;
++-
++-int d2=10;//敌机坐标
++-int d1=10;
++-int d=10;
++-int r=1;
++-int r1=1;
++-int r2=1;
++-
++-
++-int t=1; // 游戏结束
++-int f=0; // 计分数
++-int m=3; // 敌机数
++-int j=0; // 歼敌数
++-char p; // 接受按键
++-
++-
++-void kongzhi(int bx,int by);//声明函数
++-void huatu();
+++#define Kong 32
+++#define BOARD_SIZE 20
+++#define PLAYER_MIN_POS 1
+++#define PLAYER_MAX_POS 18
+++#define ENEMY_MAX_X 17
+++#define ENEMY_COUNT 3
+++
+++typedef struct
+++{
+++    int x;
+++    int y;
+++    const char *sprite;
+++} Player;
++ 
+++typedef struct
+++{
+++    int x;
+++    int y;
+++    int active;
+++    const char *sprite;
+++} Bullet;
++ 
++-void gotoxy(int x,int y) //移动坐标
+++typedef struct
++ {
++-COORD coord;
++-coord.X=x;
++-coord.Y=y;
++-SetConsoleCursorPosition( GetStdHandle( STD_OUTPUT_HANDLE ), coord );
++-}
++-void hidden()//隐藏光标
+++    int x;
+++    int y;
+++    int score;
+++    const char *sprite;
+++    const char *hit_sprite;
+++} Enemy;
+++
+++typedef struct
+++{
+++    Player player;
+++    Bullet bullet;
+++    Enemy enemies[ENEMY_COUNT];
+++    int running;
+++    int score;
+++    int total_enemies;
+++    int destroyed_enemies;
+++} GameState;
+++
+++void gotoxy(int x, int y)
++ {
++-HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
++-CONSOLE_CURSOR_INFO cci;
++-GetConsoleCursorInfo(hOut,&cci);
++-cci.bVisible=0;//赋1为显示，赋0为隐藏
++-SetConsoleCursorInfo(hOut,&cci);
+++    COORD coord;
+++    coord.X = x;
+++    coord.Y = y;
+++    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
++ }
++-//**************************************************************************************
++-
++ 
++-//说明
++-void shuoming()
+++void hidden(void)
++ {
++-printf("\t\t\t\n\n\n\n");
++-
++-printf("\t\t\t方向控制\n\n"
++-"\t\t\t上 ↑\n\n"
++-"\t\t\t下 ↓\n\n"
++-"\t\t\t左 ←\n\n"
++-"\t\t\t右 →\n\n"
++-"\t\t\t子弹 空格\n\n\n"
++-"\t\t\t退出请按 ESC\n");
++-gotoxy(0,0);
+++    HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
+++    CONSOLE_CURSOR_INFO cci;
+++    GetConsoleCursorInfo(hOut, &cci);
+++    cci.bVisible = 0;
+++    SetConsoleCursorInfo(hOut, &cci);
++ }
++ 
++-
++-//****************************************************************************************
++-
++-
++-//判断我机死没死/游戏结束
++-void byebye()
+++void shuoming(void)
++ {
++-if((x==d&&y==r)||(x==d1&&y==r1)||(x==d2&&y==r2))
++-{ gotoxy(1,3);
++-printf(" !!! 游戏结束 !!!\n"
++-"*******************\n"
++-" 您的总得分: %d\n\n"
++-" 敌机数: %d\n"
++-" 歼敌数: %d\n"
++-" 命中率: %.0f %%\n"
++-"*******************\n",f,m,j,((float)j/(float)m)*100);
++-while(!kbhit())
++-{ Sleep(500);
++-gotoxy(1,12);
++-printf(" 继续请按任意键...\n\n\n");
++-Sleep(900);
++-gotoxy(1,12);
++-printf(" ");
+++    printf("\t\t\t\n\n\n\n");
+++    printf("\t\t\t方向控制\n\n"
+++           "\t\t\t上 ↑\n\n"
+++           "\t\t\t下 ↓\n\n"
+++           "\t\t\t左 ←\n\n"
+++           "\t\t\t右 →\n\n"
+++           "\t\t\t子弹 空格\n\n\n"
+++           "\t\t\t退出请按 ESC\n");
+++    gotoxy(0, 0);
++ }
++-gotoxy(0,0);
++-huatu();
++-f=0; m=0; j=0;
++-if(x>=18) x--;
++-else x++;
++-gotoxy(x,y);
++-printf("Ж");
++-}
++-}
++-// 计分/更新敌机
++-void jifan()
++-{
++-if(x==d&&y==r)
++-{ gotoxy(d,r); printf("3");
++-Sleep(200);
++-gotoxy(d,r); printf(" "); f+=2; r=0; j++;}
++-if(x==d1&&y==r1)
++-{ gotoxy(d1,r1); printf("1");
++-Sleep(200);
++-gotoxy(d1,r1); printf(" "); f+=3; r1=0; j++;}
++-if(x==d2&&y==r2)
++-{ gotoxy(d2,r2); printf("0");
++-Sleep(200);
++-gotoxy(d2,r2); printf(" "); f+=1; r2=0; j++;}
++-
++-gotoxy(26,2);
++-printf(" %d \n",f);
++ 
+++void huatu(void)
+++{
+++    int i;
+++    int n;
+++
+++    for (i = 0; i <= BOARD_SIZE; i++)
+++    {
+++        for (n = 0; n <= BOARD_SIZE; n++)
+++        {
+++            printf("*");
+++        }
+++        printf("\n");
+++    }
+++
+++    for (i = 1; i <= 19; i++)
+++    {
+++        for (n = 1; n <= 19; n++)
+++        {
+++            gotoxy(i, n);
+++            printf(" ");
+++        }
+++    }
++ }
++-//画图
++-void huatu()
++-{ int i,n;
++ 
++-for(i=0;i<=20;i++)
++-{
++-for(n=0;n<=20;n++)
+++void draw_status(const GameState *game)
++ {
++-printf("*");
+++    gotoxy(22, 2);
+++    printf("分数: %d   ", game->score);
++ }
++-printf("\n");
++-}
++-for(i=1;i<=19;i++)
++-{
++-for(n=1;n<=19;n++)
+++
+++void clear_at(int x, int y)
++ {
++-gotoxy(i,n);
++-printf(" ");
+++    if (x >= 0 && y >= 0)
+++    {
+++        gotoxy(x, y);
+++        printf(" ");
+++    }
++ }
+++
+++void draw_player(const GameState *game)
+++{
+++    gotoxy(game->player.x, game->player.y);
+++    printf("%s", game->player.sprite);
++ }
+++
+++void move_player(GameState *game, int dx, int dy)
+++{
+++    int next_x = game->player.x + dx;
+++    int next_y = game->player.y + dy;
+++
+++    if (next_x < PLAYER_MIN_POS || next_x > PLAYER_MAX_POS || next_y < PLAYER_MIN_POS || next_y > PLAYER_MAX_POS)
+++    {
+++        return;
+++    }
+++
+++    clear_at(game->player.x, game->player.y);
+++    game->player.x = next_x;
+++    game->player.y = next_y;
+++    draw_player(game);
++ }
++ 
+++void init_enemy(Enemy *enemy, const char *sprite, const char *hit_sprite, int score, int x, int y)
+++{
+++    enemy->x = x;
+++    enemy->y = y;
+++    enemy->score = score;
+++    enemy->sprite = sprite;
+++    enemy->hit_sprite = hit_sprite;
+++}
++ 
++-//随机产生敌机
++-void dfeiji ()
+++void reset_enemy(GameState *game, Enemy *enemy)
++ {
++-while(t)
+++    enemy->x = rand() % ENEMY_MAX_X + 1;
+++    enemy->y = 0;
+++    game->total_enemies++;
+++}
+++
+++void initialize_round(GameState *game)
++ {
++-if(!r) {d=rand()%17+1; m++;}
++-if(!r1) {d1=rand()%17+1; m++;}
++-if(!r2) {d2=rand()%17+1; m++;}
+++    game->player.x = 10;
+++    game->player.y = 18;
+++    game->player.sprite = "Ж";
+++
+++    game->bullet.x = game->player.x;
+++    game->bullet.y = game->player.y;
+++    game->bullet.active = 0;
+++    game->bullet.sprite = "θ";
+++
+++    init_enemy(&game->enemies[0], "Ψ", "3", 2, 10, 1);
+++    init_enemy(&game->enemies[1], "ж", "1", 3, 10, 1);
+++    init_enemy(&game->enemies[2], "♀", "0", 1, 10, 1);
+++
+++    game->running = 1;
+++    game->score = 0;
+++    game->total_enemies = ENEMY_COUNT;
+++    game->destroyed_enemies = 0;
+++}
++ 
++-while(t)
++-{ r++; r1++; r2++;
++-gotoxy(d,r); printf("Ψ");
++-gotoxy(d1,r1); printf("ж");
++-gotoxy(d2,r2); printf("♀");
++-Sleep(900);
++-gotoxy(d,r); printf(" ");
++-gotoxy(d1,r1); printf(" ");
++-gotoxy(d2,r2); printf(" ");
+++int is_player_hit(const GameState *game)
+++{
+++    int i;
++ 
+++    for (i = 0; i < ENEMY_COUNT; i++)
+++    {
+++        if (game->player.x == game->enemies[i].x && game->player.y == game->enemies[i].y)
+++        {
+++            return 1;
+++        }
+++    }
++ 
++-kongzhi(0,0);
++-byebye();
++-if(r==18) r=0;
++-if(r1==18) r1=0;
++-if(r2==18) r2=0;
++-if(r==0||r1==0||r2==0) break;
+++    return 0;
++ }
++-}
++-}
++-
++ 
++-//操控飞机
++-void kongzhi(int bx,int by)
++-{int a;
+++Enemy *find_bullet_target(GameState *game)
+++{
+++    int i;
++ 
+++    for (i = 0; i < ENEMY_COUNT; i++)
+++    {
+++        if (game->bullet.active && game->bullet.x == game->enemies[i].x && game->bullet.y == game->enemies[i].y)
+++        {
+++            return &game->enemies[i];
+++        }
+++    }
++ 
++-while (kbhit())
++-{if ((p=getch())==-32) p=getch();
++-a=p;
++-gotoxy(22,5);
+++    return NULL;
+++}
++ 
++-switch(a)
++-{//控制方向
++-case Up:if (y!=1)
++-{ gotoxy(x,y); printf(" ");
++-y--;
++-gotoxy(x,y); printf("Ж");
++-}break;
++-case Down:if (y!=18)
++-{ gotoxy(x,y); printf(" ");
++-y++;
++-gotoxy(x,y); printf("Ж");
++-}break;
++-case Left:if (x!=1)
++-{ gotoxy(x,y); printf(" ");
++-x--;
++-gotoxy(x,y); printf("Ж");
++-}break;
++-case Right:if (x!=18)
++-{ gotoxy(x,y); printf(" ");
++-x++;
++-gotoxy(x,y); printf("Ж");
++-}break;
++-case Kong:{ bx=y;
++-for(by=y;by>1;) //发射子弹
++-{ by--;
++-gotoxy(x,by); printf("θ");
++-Sleep(10);
++-gotoxy(x,by); printf(" ");
++-y=by;
++-jifan();
++-if(r==0||r1==0||r2==0) break;
+++int resolve_bullet_collision(GameState *game)
+++{
+++    Enemy *target = find_bullet_target(game);
+++
+++    if (target == NULL)
+++    {
+++        return 0;
+++    }
+++
+++    gotoxy(target->x, target->y);
+++    printf("%s", target->hit_sprite);
+++    Sleep(200);
+++    clear_at(target->x, target->y);
+++
+++    game->score += target->score;
+++    game->destroyed_enemies++;
+++    target->y = 0;
+++    game->bullet.active = 0;
+++    draw_status(game);
+++    draw_player(game);
+++
+++    return 1;
++ }
++-y=bx;
++-}break;
++ 
++-case Esc:t=0; break; //退出
+++void fire_bullet(GameState *game)
+++{
+++    game->bullet.x = game->player.x;
+++    game->bullet.y = game->player.y;
+++    game->bullet.active = 1;
+++
+++    while (game->bullet.active && game->bullet.y > PLAYER_MIN_POS)
+++    {
+++        game->bullet.y--;
+++        gotoxy(game->bullet.x, game->bullet.y);
+++        printf("%s", game->bullet.sprite);
+++        Sleep(10);
+++
+++        if (!resolve_bullet_collision(game))
+++        {
+++            clear_at(game->bullet.x, game->bullet.y);
+++        }
+++    }
+++
+++    game->bullet.active = 0;
+++    draw_player(game);
+++}
++ 
++-default:break;
+++void wait_for_restart_key(void)
+++{
+++    while (!kbhit())
+++    {
+++        Sleep(500);
+++        gotoxy(1, 12);
+++        printf(" 继续请按任意键...    ");
+++        Sleep(900);
+++        gotoxy(1, 12);
+++        printf("                    ");
+++    }
+++
+++    while (kbhit())
+++    {
+++        getch();
+++    }
++ }
+++
+++void handle_game_over(GameState *game)
+++{
+++    float accuracy = 0.0f;
+++
+++    if (game->total_enemies > 0)
+++    {
+++        accuracy = ((float)game->destroyed_enemies / (float)game->total_enemies) * 100.0f;
+++    }
+++
+++    gotoxy(1, 3);
+++    printf(" !!! 游戏结束 !!!\n"
+++           "*******************\n"
+++           " 您的总得分: %d\n\n"
+++           " 敌机数: %d\n"
+++           " 歼敌数: %d\n"
+++           " 命中率: %.0f %%\n"
+++           "*******************\n",
+++           game->score,
+++           game->total_enemies,
+++           game->destroyed_enemies,
+++           accuracy);
+++
+++    wait_for_restart_key();
+++    gotoxy(0, 0);
+++    huatu();
+++    initialize_round(game);
+++    draw_status(game);
+++    draw_player(game);
++ }
+++
+++void update_enemies(GameState *game)
+++{
+++    int i;
+++
+++    for (i = 0; i < ENEMY_COUNT; i++)
+++    {
+++        if (game->enemies[i].y == 0)
+++        {
+++            reset_enemy(game, &game->enemies[i]);
+++        }
+++
+++        game->enemies[i].y++;
+++        gotoxy(game->enemies[i].x, game->enemies[i].y);
+++        printf("%s", game->enemies[i].sprite);
+++    }
+++
+++    Sleep(900);
+++
+++    if (is_player_hit(game))
+++    {
+++        handle_game_over(game);
+++        return;
+++    }
+++
+++    for (i = 0; i < ENEMY_COUNT; i++)
+++    {
+++        clear_at(game->enemies[i].x, game->enemies[i].y);
+++        if (game->enemies[i].y == PLAYER_MAX_POS)
+++        {
+++            game->enemies[i].y = 0;
+++        }
+++    }
+++
+++    draw_player(game);
++ }
++ 
++-void main()
+++void handle_input(GameState *game)
++ {
++-srand(time(NULL));
++-shuoming();
++-hidden();
++-huatu();
++-gotoxy(x,y);
++-printf("Ж");
+++    int key;
+++
+++    while (kbhit())
+++    {
+++        key = getch();
+++        if (key == 0 || key == 224)
+++        {
+++            key = getch();
+++        }
+++
+++        switch (key)
+++        {
+++        case Up:
+++            move_player(game, 0, -1);
+++            break;
+++        case Down:
+++            move_player(game, 0, 1);
+++            break;
+++        case Left:
+++            move_player(game, -1, 0);
+++            break;
+++        case Right:
+++            move_player(game, 1, 0);
+++            break;
+++        case Kong:
+++            fire_bullet(game);
+++            break;
+++        case Esc:
+++            game->running = 0;
+++            return;
+++        default:
+++            break;
+++        }
+++
+++        if (is_player_hit(game))
+++        {
+++            handle_game_over(game);
+++            return;
+++        }
+++    }
+++}
++ 
++-gotoxy(22,2);
++-printf("分数:");
++-while (t)
++-{ kongzhi(0,0);
++-if(t)
++-dfeiji ();
+++void run_game(GameState *game)
+++{
+++    while (game->running)
+++    {
+++        handle_input(game);
+++        if (!game->running)
+++        {
+++            break;
+++        }
+++        update_enemies(game);
+++    }
++ }
++ 
+++int main(void)
+++{
+++    GameState game;
+++
+++    srand((unsigned)time(NULL));
+++    shuoming();
+++    hidden();
+++    huatu();
+++    initialize_round(&game);
+++    draw_status(&game);
+++    draw_player(&game);
+++    run_game(&game);
+++
+++    return 0;
++ }
