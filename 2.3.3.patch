@@ -1,0 +1,331 @@
+================================================================================
+  Hit the plane v2.3.3 重构说明
+================================================================================
+
+本次重构在 v2.3.2（已去除全局变量和 goto，引入结构体）的基础上进一步改进。
+
+一、核心改动概览
+--------------------------------------------------------------------------------
+| 改动项            | v2.3.2 问题                              | v2.3.3 改进                          |
+|-------------------|------------------------------------------|--------------------------------------|
+| 状态机            | running 布尔值 + 隐式状态切换            | GameStateEnum 枚举，三态显式管理     |
+| Enemy 存活状态    | 用 y==0 隐式判断"死亡"                   | 新增 alive 字段，语义明确             |
+| 敌机生成计数      | reset_enemy() 每次 ++total_enemies (Bug) | enemy_respawn() 仅在重生时 ++         |
+| 碰撞检测          | 逻辑与渲染混杂 (resolve_bullet_collision)| 纯逻辑返回索引 + 独立渲染             |
+| 敌机更新          | 一个函数做：生成+移动+渲染+碰撞+清理     | 拆分为 spawn / update_positions 两步 |
+| 游戏结束处理      | handle_game_over 同时显示+重置           | show_gameover_screen + game_restart   |
+| 函数命名          | 拼音混用 (huatu, shuoming, jifan...)     | 全英文语义化命名                      |
+| 主循环            | run_game 无显式状态退出                  | game_loop 基于 GameStateEnum 控制     |
+
+
+二、数据结构改动
+--------------------------------------------------------------------------------
+
+--- v2.3.2 Enemy 结构体
+    typedef struct {
+        int x;
+        int y;
+        int score;
+        const char *sprite;
+        const char *hit_sprite;
+    } Enemy;
+
++++ v2.3.3 Enemy 结构体（新增 alive 字段）
+    typedef struct {
+        int x;
+        int y;
+        int score;
+        int alive;               // <-- 新增：显式存活状态
+        const char *sprite;
+        const char *hit_sprite;
+    } Enemy;
+
+--- v2.3.2 GameState 结构体
+    typedef struct {
+        Player player;
+        Bullet bullet;
+        Enemy enemies[ENEMY_COUNT];
+        int running;
+        int score;
+        int total_enemies;
+        int destroyed_enemies;
+    } GameState;
+
++++ v2.3.3 GameState 结构体（新增枚举状态、重命名字段）
+    typedef enum {
+        STATE_RUNNING,           // <-- 新增：三态枚举替代布尔 running
+        STATE_GAMEOVER,
+        STATE_QUIT
+    } GameStateEnum;
+
+    typedef struct {
+        Player  player;
+        Bullet  bullet;
+        Enemy   enemies[ENEMY_COUNT];
+        GameStateEnum state;     // <-- 替代 int running
+        int     score;
+        int     total_spawned;   // <-- 重命名，语义：累计生成敌机数
+        int     destroyed;       // <-- 重命名
+    } GameState;
+
+
+三、关键函数重构对照
+--------------------------------------------------------------------------------
+
+>> 3.1 敌机生成 —— Bug 修复
+
+--- v2.3.2: 每次 y==0 触发都递增 total_enemies（错误）
+    void reset_enemy(GameState *game, Enemy *enemy)
+    {
+        enemy->x = rand() % ENEMY_MAX_X + 1;
+        enemy->y = 0;
+        game->total_enemies++;
+    }
+
++++ v2.3.3: 用 alive 控制，仅在真正重生时递增 total_spawned
+    void enemy_respawn(GameState *game, Enemy *e)
+    {
+        e->x = rand() % ENEMY_MAX_X + 1;
+        e->y = 1;
+        e->alive = 1;
+        game->total_spawned++;
+    }
+
+    void spawn_dead_enemies(GameState *game)
+    {
+        int i;
+        for (i = 0; i < ENEMY_COUNT; i++) {
+            if (!game->enemies[i].alive && game->enemies[i].y == 0) {
+                enemy_respawn(game, &game->enemies[i]);
+            }
+        }
+    }
+
+
+>> 3.2 碰撞检测 —— 逻辑/渲染分离
+
+--- v2.3.2: 一个函数混合查找、渲染、状态修改
+    int resolve_bullet_collision(GameState *game)
+    {
+        Enemy *target = find_bullet_target(game);
+        if (target == NULL) return 0;
+
+        gotoxy(target->x, target->y);          // 渲染
+        printf("%s", target->hit_sprite);       // 渲染
+        Sleep(200);                             // 渲染
+        clear_at(target->x, target->y);         // 渲染
+
+        game->score += target->score;           // 逻辑
+        game->destroyed_enemies++;              // 逻辑
+        target->y = 0;                          // 逻辑（隐式标记死亡）
+        game->bullet.active = 0;                // 逻辑
+        draw_status(game);                      // 渲染
+        draw_player(game);                      // 渲染
+        return 1;
+    }
+
++++ v2.3.3: 拆分为纯逻辑查询 + 独立渲染 + 独立状态处理
+    int bullet_hit_enemy_index(const GameState *game)    // 纯逻辑
+    {
+        int i;
+        if (!game->bullet.active) return -1;
+        for (i = 0; i < ENEMY_COUNT; i++) {
+            if (!game->enemies[i].alive) continue;
+            if (game->bullet.x == game->enemies[i].x &&
+                game->bullet.y == game->enemies[i].y) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    void draw_hit_effect(const Enemy *target)            // 纯渲染
+    {
+        gotoxy(target->x, target->y);
+        printf("%s", target->hit_sprite);
+        Sleep(200);
+        clear_cell(target->x, target->y);
+    }
+
+    void process_bullet_hit(GameState *game, int idx)    // 纯逻辑
+    {
+        Enemy *target = &game->enemies[idx];
+        draw_hit_effect(target);
+        game->score += target->score;
+        game->destroyed++;
+        target->alive = 0;
+        target->y = 0;
+        game->bullet.active = 0;
+        draw_status(game);
+        draw_player(game);
+    }
+
+
+>> 3.3 敌机更新 —— 单一大函数拆解
+
+--- v2.3.2: update_enemies() 一个函数做所有事
+    void update_enemies(GameState *game)
+    {
+        int i;
+        for (i = 0; i < ENEMY_COUNT; i++) {
+            if (game->enemies[i].y == 0)
+                reset_enemy(game, &game->enemies[i]);  // 生成
+            game->enemies[i].y++;
+            gotoxy(...); printf(...);                    // 渲染
+        }
+        Sleep(900);
+        if (is_player_hit(game)) {                       // 碰撞
+            handle_game_over(game);                      // 结算+重启
+            return;
+        }
+        for (i = 0; i < ENEMY_COUNT; i++) {
+            clear_at(...);                                // 清理
+            if (game->enemies[i].y == PLAYER_MAX_POS)
+                game->enemies[i].y = 0;
+        }
+        draw_player(game);
+    }
+
++++ v2.3.3: 拆分为 spawn + update_positions + 上层编排
+    void spawn_dead_enemies(GameState *game)        // 职责1：生成
+    { ... }
+
+    void update_enemy_positions(GameState *game)    // 职责2：移动+渲染+清理
+    {
+        int i;
+        for (i = 0; i < ENEMY_COUNT; i++) {
+            if (!game->enemies[i].alive) continue;
+            clear_cell(game->enemies[i].x, game->enemies[i].y);
+            game->enemies[i].y++;
+            if (game->enemies[i].y > PLAYER_MAX) {
+                game->enemies[i].alive = 0;
+                game->enemies[i].y = 0;
+            } else {
+                draw_enemy(&game->enemies[i]);
+            }
+        }
+    }
+
+    void update_enemies(GameState *game)            // 职责3：编排+碰撞
+    {
+        spawn_dead_enemies(game);
+        update_enemy_positions(game);
+        Sleep(900);
+        if (player_hit_by_enemy(game)) {
+            show_gameover_screen(game);              // 纯显示
+            game_restart(game);                      // 纯重启
+        }
+    }
+
+
+>> 3.4 游戏结束 —— 显示与重置解耦
+
+--- v2.3.2: 一个函数既显示又重置
+    void handle_game_over(GameState *game)
+    {
+        // 计算命中率...
+        printf("!!! 游戏结束 !!!\n...");    // 显示
+        wait_for_restart_key();              // 等待输入
+        gotoxy(0, 0);
+        huatu();                             // 重绘边框
+        initialize_round(game);              // 重置状态
+        draw_status(game);                   // 显示新状态
+        draw_player(game);
+    }
+
++++ v2.3.3: 显示和重置彻底分开
+    void show_gameover_screen(const GameState *game)  // 只读：纯显示
+    {
+        float accuracy = ...;
+        gotoxy(1, 3);
+        printf("!!! 游戏结束 !!!\n...");
+    }
+
+    void game_restart(GameState *game)                // 写入：纯重置
+    {
+        wait_any_key();
+        gotoxy(0, 0);
+        draw_border();
+        game_init(game);
+        draw_status(game);
+        draw_player(game);
+    }
+
+
+>> 3.5 主游戏循环 —— 显式状态机驱动
+
+--- v2.3.2
+    void run_game(GameState *game)
+    {
+        while (game->running) {
+            handle_input(game);
+            if (!game->running) break;
+            update_enemies(game);
+        }
+    }
+
++++ v2.3.3
+    void game_loop(GameState *game)
+    {
+        while (game->state == STATE_RUNNING) {
+            handle_input(game);
+            if (game->state != STATE_RUNNING) break;
+            update_enemies(game);
+        }
+    }
+
+    void process_player_input(GameState *game, int key)  // 新增：单键处理
+    {
+        switch (key) {
+        case UP_KEY:    move_player(game, 0, -1); break;
+        case DOWN_KEY:  move_player(game, 0,  1); break;
+        case LEFT_KEY:  move_player(game, -1, 0); break;
+        case RIGHT_KEY: move_player(game, 1,  0); break;
+        case SPACE_KEY: fire_bullet(game);         break;
+        case ESC_KEY:   game->state = STATE_QUIT;  return;
+        }
+    }
+
+
+四、函数命名对照表
+--------------------------------------------------------------------------------
+v2.3.2 名称           →  v2.3.3 名称              说明
+───────────────────────────────────────────────────────────────────────
+hidden()              →  cursor_hide()             更精确描述功能
+shuoming()            →  show_instructions()       英文语义化
+huatu()               →  draw_border()             明确是绘制边框
+clear_at()            →  clear_cell()              统一命名风格
+draw_status()         →  draw_status()             保留（已合理）
+draw_player()         →  draw_player()             保留（已合理）
+move_player()         →  move_player()             保留（已合理）
+init_enemy()          →  enemy_init()              名词在前，风格统一
+reset_enemy()         →  enemy_respawn()           明确是"重生"
+initialize_round()    →  game_init()               简化为 game_init
+is_player_hit()       →  player_hit_by_enemy()     明确是被敌机击中
+find_bullet_target()  →  bullet_hit_enemy_index()  返回索引更精确
+resolve_bullet_...()  →  process_bullet_hit()      配合新拆分结构
+fire_bullet()         →  fire_bullet()             保留（已合理）
+wait_for_restart_key()→  wait_any_key()            简化
+handle_game_over()    →  show_gameover_screen()    拆分为2个函数
+                      →  game_restart()
+update_enemies()      →  update_enemies()          保留（内部已拆分）
+                      →  spawn_dead_enemies()      新增子函数
+                      →  update_enemy_positions()  新增子函数
+handle_input()        →  handle_input()            保留
+                      →  process_player_input()    新增子函数
+run_game()            →  game_loop()               强调是主循环
+
+
+五、不变量（保持原有玩法不变）
+--------------------------------------------------------------------------------
+- 控制台边框 20x20 区域                                           [不变]
+- 玩家飞机用 "Ж" 符号，方向键控制移动                             [不变]
+- 3 架敌机分别用 "Ψ"/"ж"/"♀"，分值 2/3/1                         [不变]
+- 子弹用 "θ" 符号，空格键发射，逐格向上移动，速度 Sleep(10)       [不变]
+- 击中后显示数字特效 (Sleep 200ms) 后清除                         [不变]
+- 敌机每轮下移一格，间隔 Sleep(900)                               [不变]
+- 玩家与敌机坐标重合 = 游戏结束                                   [不变]
+- 游戏结束显示得分/敌机数/歼敌数/命中率                           [不变]
+- 按任意键重新开始                                                [不变]
+- ESC 退出游戏                                                    [不变]
+================================================================================

@@ -4,51 +4,54 @@
 #include <conio.h>
 #include <time.h>
 
-#define Esc 27
-#define Up 72
-#define Down 80
-#define Left 75
-#define Right 77
-#define Kong 32
+#define ESC_KEY    27
+#define UP_KEY     72
+#define DOWN_KEY   80
+#define LEFT_KEY   75
+#define RIGHT_KEY  77
+#define SPACE_KEY  32
 #define BOARD_SIZE 20
-#define PLAYER_MIN_POS 1
-#define PLAYER_MAX_POS 18
+#define PLAYER_MIN 1
+#define PLAYER_MAX 18
 #define ENEMY_MAX_X 17
 #define ENEMY_COUNT 3
 
-typedef struct
-{
+typedef struct {
     int x;
     int y;
     const char *sprite;
 } Player;
 
-typedef struct
-{
+typedef struct {
     int x;
     int y;
     int active;
     const char *sprite;
 } Bullet;
 
-typedef struct
-{
+typedef struct {
     int x;
     int y;
     int score;
+    int alive;
     const char *sprite;
     const char *hit_sprite;
 } Enemy;
 
-typedef struct
-{
-    Player player;
-    Bullet bullet;
-    Enemy enemies[ENEMY_COUNT];
-    int running;
-    int score;
-    int total_enemies;
-    int destroyed_enemies;
+typedef enum {
+    STATE_RUNNING,
+    STATE_GAMEOVER,
+    STATE_QUIT
+} GameStateEnum;
+
+typedef struct {
+    Player  player;
+    Bullet  bullet;
+    Enemy   enemies[ENEMY_COUNT];
+    GameStateEnum state;
+    int     score;
+    int     total_spawned;
+    int     destroyed;
 } GameState;
 
 void gotoxy(int x, int y)
@@ -59,7 +62,7 @@ void gotoxy(int x, int y)
     SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
 }
 
-void hidden(void)
+void cursor_hide(void)
 {
     HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     CONSOLE_CURSOR_INFO cci;
@@ -68,37 +71,30 @@ void hidden(void)
     SetConsoleCursorInfo(hOut, &cci);
 }
 
-void shuoming(void)
+void show_instructions(void)
 {
     printf("\t\t\t\n\n\n\n");
-    printf("\t\t\t方向控制\n\n"
-           "\t\t\t上 ↑\n\n"
-           "\t\t\t下 ↓\n\n"
-           "\t\t\t左 ←\n\n"
-           "\t\t\t右 →\n\n"
-           "\t\t\t子弹 空格\n\n\n"
-           "\t\t\t退出请按 ESC\n");
+    printf("\t\t\t  方向控制\n\n"
+           "\t\t\t  上  ↑\n\n"
+           "\t\t\t  下  ↓\n\n"
+           "\t\t\t  左  ←\n\n"
+           "\t\t\t  右  →\n\n"
+           "\t\t\t  子弹 空格\n\n\n"
+           "\t\t\t  退出请按 ESC\n");
     gotoxy(0, 0);
 }
 
-void huatu(void)
+void draw_border(void)
 {
-    int i;
-    int n;
-
-    for (i = 0; i <= BOARD_SIZE; i++)
-    {
-        for (n = 0; n <= BOARD_SIZE; n++)
-        {
+    int i, n;
+    for (i = 0; i <= BOARD_SIZE; i++) {
+        for (n = 0; n <= BOARD_SIZE; n++) {
             printf("*");
         }
         printf("\n");
     }
-
-    for (i = 1; i <= 19; i++)
-    {
-        for (n = 1; n <= 19; n++)
-        {
+    for (i = 1; i <= BOARD_SIZE - 1; i++) {
+        for (n = 1; n <= BOARD_SIZE - 1; n++) {
             gotoxy(i, n);
             printf(" ");
         }
@@ -111,13 +107,10 @@ void draw_status(const GameState *game)
     printf("分数: %d   ", game->score);
 }
 
-void clear_at(int x, int y)
+void clear_cell(int x, int y)
 {
-    if (x >= 0 && y >= 0)
-    {
-        gotoxy(x, y);
-        printf(" ");
-    }
+    gotoxy(x, y);
+    printf(" ");
 }
 
 void draw_player(const GameState *game)
@@ -126,129 +119,134 @@ void draw_player(const GameState *game)
     printf("%s", game->player.sprite);
 }
 
+int can_move_to(const GameState *game, int nx, int ny)
+{
+    return (nx >= PLAYER_MIN && nx <= PLAYER_MAX &&
+            ny >= PLAYER_MIN && ny <= PLAYER_MAX);
+}
+
 void move_player(GameState *game, int dx, int dy)
 {
-    int next_x = game->player.x + dx;
-    int next_y = game->player.y + dy;
-
-    if (next_x < PLAYER_MIN_POS || next_x > PLAYER_MAX_POS || next_y < PLAYER_MIN_POS || next_y > PLAYER_MAX_POS)
-    {
-        return;
-    }
-
-    clear_at(game->player.x, game->player.y);
-    game->player.x = next_x;
-    game->player.y = next_y;
+    int nx = game->player.x + dx;
+    int ny = game->player.y + dy;
+    if (!can_move_to(game, nx, ny)) return;
+    clear_cell(game->player.x, game->player.y);
+    game->player.x = nx;
+    game->player.y = ny;
     draw_player(game);
 }
 
-void init_enemy(Enemy *enemy, const char *sprite, const char *hit_sprite, int score, int x, int y)
+void enemy_init(Enemy *e, const char *sprite, const char *hit, int score, int x, int y)
 {
-    enemy->x = x;
-    enemy->y = y;
-    enemy->score = score;
-    enemy->sprite = sprite;
-    enemy->hit_sprite = hit_sprite;
+    e->x = x;
+    e->y = y;
+    e->score = score;
+    e->alive = 1;
+    e->sprite = sprite;
+    e->hit_sprite = hit;
 }
 
-void reset_enemy(GameState *game, Enemy *enemy)
+void enemy_respawn(GameState *game, Enemy *e)
 {
-    enemy->x = rand() % ENEMY_MAX_X + 1;
-    enemy->y = 0;
-    game->total_enemies++;
+    e->x = rand() % ENEMY_MAX_X + 1;
+    e->y = 1;
+    e->alive = 1;
+    game->total_spawned++;
 }
 
-void initialize_round(GameState *game)
+void game_init(GameState *game)
 {
     game->player.x = 10;
     game->player.y = 18;
     game->player.sprite = "Ж";
 
-    game->bullet.x = game->player.x;
-    game->bullet.y = game->player.y;
+    game->bullet.x = 10;
+    game->bullet.y = 18;
     game->bullet.active = 0;
     game->bullet.sprite = "θ";
 
-    init_enemy(&game->enemies[0], "Ψ", "3", 2, 10, 1);
-    init_enemy(&game->enemies[1], "ж", "1", 3, 10, 1);
-    init_enemy(&game->enemies[2], "♀", "0", 1, 10, 1);
+    enemy_init(&game->enemies[0], "Ψ", "3", 2, 5, 1);
+    enemy_init(&game->enemies[1], "ж", "1", 3, 10, 1);
+    enemy_init(&game->enemies[2], "♀", "0", 1, 15, 1);
 
-    game->running = 1;
+    game->state = STATE_RUNNING;
     game->score = 0;
-    game->total_enemies = ENEMY_COUNT;
-    game->destroyed_enemies = 0;
+    game->total_spawned = ENEMY_COUNT;
+    game->destroyed = 0;
 }
 
-int is_player_hit(const GameState *game)
+int player_hit_by_enemy(const GameState *game)
 {
     int i;
-
-    for (i = 0; i < ENEMY_COUNT; i++)
-    {
-        if (game->player.x == game->enemies[i].x && game->player.y == game->enemies[i].y)
-        {
+    for (i = 0; i < ENEMY_COUNT; i++) {
+        if (!game->enemies[i].alive) continue;
+        if (game->player.x == game->enemies[i].x &&
+            game->player.y == game->enemies[i].y) {
             return 1;
         }
     }
-
     return 0;
 }
 
-Enemy *find_bullet_target(GameState *game)
+int bullet_hit_enemy_index(const GameState *game)
 {
     int i;
-
-    for (i = 0; i < ENEMY_COUNT; i++)
-    {
-        if (game->bullet.active && game->bullet.x == game->enemies[i].x && game->bullet.y == game->enemies[i].y)
-        {
-            return &game->enemies[i];
+    if (!game->bullet.active) return -1;
+    for (i = 0; i < ENEMY_COUNT; i++) {
+        if (!game->enemies[i].alive) continue;
+        if (game->bullet.x == game->enemies[i].x &&
+            game->bullet.y == game->enemies[i].y) {
+            return i;
         }
     }
-
-    return NULL;
+    return -1;
 }
 
-int resolve_bullet_collision(GameState *game)
+void draw_hit_effect(const Enemy *target)
 {
-    Enemy *target = find_bullet_target(game);
-
-    if (target == NULL)
-    {
-        return 0;
-    }
-
     gotoxy(target->x, target->y);
     printf("%s", target->hit_sprite);
     Sleep(200);
-    clear_at(target->x, target->y);
+    clear_cell(target->x, target->y);
+}
 
+void process_bullet_hit(GameState *game, int enemy_idx)
+{
+    Enemy *target = &game->enemies[enemy_idx];
+    draw_hit_effect(target);
     game->score += target->score;
-    game->destroyed_enemies++;
+    game->destroyed++;
+    target->alive = 0;
     target->y = 0;
     game->bullet.active = 0;
     draw_status(game);
     draw_player(game);
+}
 
-    return 1;
+void draw_bullet_step(const GameState *game)
+{
+    gotoxy(game->bullet.x, game->bullet.y);
+    printf("%s", game->bullet.sprite);
+    Sleep(10);
 }
 
 void fire_bullet(GameState *game)
 {
+    int hit_idx;
+
     game->bullet.x = game->player.x;
     game->bullet.y = game->player.y;
     game->bullet.active = 1;
 
-    while (game->bullet.active && game->bullet.y > PLAYER_MIN_POS)
-    {
+    while (game->bullet.active && game->bullet.y > PLAYER_MIN) {
         game->bullet.y--;
-        gotoxy(game->bullet.x, game->bullet.y);
-        printf("%s", game->bullet.sprite);
-        Sleep(10);
+        draw_bullet_step(game);
 
-        if (!resolve_bullet_collision(game))
-        {
-            clear_at(game->bullet.x, game->bullet.y);
+        hit_idx = bullet_hit_enemy_index(game);
+        if (hit_idx >= 0) {
+            process_bullet_hit(game, hit_idx);
+        } else {
+            clear_cell(game->bullet.x, game->bullet.y);
         }
     }
 
@@ -256,10 +254,9 @@ void fire_bullet(GameState *game)
     draw_player(game);
 }
 
-void wait_for_restart_key(void)
+void wait_any_key(void)
 {
-    while (!kbhit())
-    {
+    while (!kbhit()) {
         Sleep(500);
         gotoxy(1, 12);
         printf(" 继续请按任意键...    ");
@@ -267,22 +264,15 @@ void wait_for_restart_key(void)
         gotoxy(1, 12);
         printf("                    ");
     }
-
-    while (kbhit())
-    {
-        getch();
-    }
+    while (kbhit()) getch();
 }
 
-void handle_game_over(GameState *game)
+void show_gameover_screen(const GameState *game)
 {
     float accuracy = 0.0f;
-
-    if (game->total_enemies > 0)
-    {
-        accuracy = ((float)game->destroyed_enemies / (float)game->total_enemies) * 100.0f;
+    if (game->total_spawned > 0) {
+        accuracy = (float)game->destroyed / (float)game->total_spawned * 100.0f;
     }
-
     gotoxy(1, 3);
     printf(" !!! 游戏结束 !!!\n"
            "*******************\n"
@@ -292,107 +282,100 @@ void handle_game_over(GameState *game)
            " 命中率: %.0f %%\n"
            "*******************\n",
            game->score,
-           game->total_enemies,
-           game->destroyed_enemies,
+           game->total_spawned,
+           game->destroyed,
            accuracy);
+}
 
-    wait_for_restart_key();
+void game_restart(GameState *game)
+{
+    wait_any_key();
     gotoxy(0, 0);
-    huatu();
-    initialize_round(game);
+    draw_border();
+    game_init(game);
     draw_status(game);
     draw_player(game);
 }
 
-void update_enemies(GameState *game)
+void draw_enemy(const Enemy *e)
+{
+    if (!e->alive) return;
+    gotoxy(e->x, e->y);
+    printf("%s", e->sprite);
+}
+
+void spawn_dead_enemies(GameState *game)
 {
     int i;
-
-    for (i = 0; i < ENEMY_COUNT; i++)
-    {
-        if (game->enemies[i].y == 0)
-        {
-            reset_enemy(game, &game->enemies[i]);
+    for (i = 0; i < ENEMY_COUNT; i++) {
+        if (!game->enemies[i].alive && game->enemies[i].y == 0) {
+            enemy_respawn(game, &game->enemies[i]);
         }
-
-        game->enemies[i].y++;
-        gotoxy(game->enemies[i].x, game->enemies[i].y);
-        printf("%s", game->enemies[i].sprite);
     }
+}
 
+void update_enemy_positions(GameState *game)
+{
+    int i;
+    for (i = 0; i < ENEMY_COUNT; i++) {
+        if (!game->enemies[i].alive) continue;
+        clear_cell(game->enemies[i].x, game->enemies[i].y);
+        game->enemies[i].y++;
+
+        if (game->enemies[i].y > PLAYER_MAX) {
+            game->enemies[i].alive = 0;
+            game->enemies[i].y = 0;
+        } else {
+            draw_enemy(&game->enemies[i]);
+        }
+    }
+}
+
+void update_enemies(GameState *game)
+{
+    spawn_dead_enemies(game);
+    update_enemy_positions(game);
     Sleep(900);
 
-    if (is_player_hit(game))
-    {
-        handle_game_over(game);
-        return;
+    if (player_hit_by_enemy(game)) {
+        show_gameover_screen(game);
+        game_restart(game);
     }
+}
 
-    for (i = 0; i < ENEMY_COUNT; i++)
-    {
-        clear_at(game->enemies[i].x, game->enemies[i].y);
-        if (game->enemies[i].y == PLAYER_MAX_POS)
-        {
-            game->enemies[i].y = 0;
-        }
+void process_player_input(GameState *game, int key)
+{
+    switch (key) {
+    case UP_KEY:    move_player(game, 0, -1); break;
+    case DOWN_KEY:  move_player(game, 0,  1); break;
+    case LEFT_KEY:  move_player(game, -1, 0); break;
+    case RIGHT_KEY: move_player(game, 1,  0); break;
+    case SPACE_KEY: fire_bullet(game);         break;
+    case ESC_KEY:   game->state = STATE_QUIT;  return;
     }
-
-    draw_player(game);
 }
 
 void handle_input(GameState *game)
 {
     int key;
-
-    while (kbhit())
-    {
+    while (kbhit()) {
         key = getch();
-        if (key == 0 || key == 224)
-        {
-            key = getch();
-        }
-
-        switch (key)
-        {
-        case Up:
-            move_player(game, 0, -1);
-            break;
-        case Down:
-            move_player(game, 0, 1);
-            break;
-        case Left:
-            move_player(game, -1, 0);
-            break;
-        case Right:
-            move_player(game, 1, 0);
-            break;
-        case Kong:
-            fire_bullet(game);
-            break;
-        case Esc:
-            game->running = 0;
-            return;
-        default:
-            break;
-        }
-
-        if (is_player_hit(game))
-        {
-            handle_game_over(game);
+        if (key == 0 || key == 224) key = getch();
+        process_player_input(game, key);
+        if (game->state != STATE_RUNNING) return;
+        if (player_hit_by_enemy(game)) {
+            show_gameover_screen(game);
+            game_restart(game);
             return;
         }
     }
 }
 
-void run_game(GameState *game)
+void game_loop(GameState *game)
 {
-    while (game->running)
-    {
+    while (game->state == STATE_RUNNING) {
         handle_input(game);
-        if (!game->running)
-        {
-            break;
-        }
+        if (game->state != STATE_RUNNING) break;
         update_enemies(game);
     }
 }
@@ -400,15 +383,13 @@ void run_game(GameState *game)
 int main(void)
 {
     GameState game;
-
     srand((unsigned)time(NULL));
-    shuoming();
-    hidden();
-    huatu();
-    initialize_round(&game);
+    show_instructions();
+    cursor_hide();
+    draw_border();
+    game_init(&game);
     draw_status(&game);
     draw_player(&game);
-    run_game(&game);
-
+    game_loop(&game);
     return 0;
 }
